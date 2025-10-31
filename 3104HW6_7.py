@@ -304,70 +304,65 @@ n = 60
 #print(f"Minimum drops to grow from 1 to {n} inches with budget {D0} using memoization:", minDropsWithBudget_Memoize(D0, n))  # Output: Minimum drops with budget using memoization
 
 
-# Recover the solution
-# Write code that will also return the min number of drops
-# along with list of fertilizers (in order) that will achieve this min number
+# Recover the solution (forward DP to avoid dead lengths)
+# Return min number of drops and list of fertilizers (in order) that achieve it
 def minDropsWithBudget_Solution(D, n):
-    memo = {} # initialize memoization table
-    choice = {} # track choices
+    growths = [1, 4, 5, 11]
+    costs = [1, 2, 3, 7]
+    memo = {}   # (j, d) -> min drops from length j with budget d
+    choice = {} # (j, d) -> chosen growth
 
-    #helpder function for recursion with memoization
-    def helper(d, target):
-        if (d, target) in memo: # check if already computed
-            return memo[(d, target)]
-
-        #base cases
-        if target == 1: # reached desired length
-            memo[(d, target)] = 0
-            choice[(d, target)] = None
-            return 0
-        if target < 1: # exceeded desired length
+    def helper(j, d):
+        # If reached target, require final budget strictly > 0
+        if j == n:
+            return 0 if d > 0 else float('inf')
+        # invalid states
+        if j > n or d <= 0 or j % 7 == 2:
             return float('inf')
+        if (j, d) in memo:
+            return memo[(j, d)]
 
-        drops = [(1, 1), (4, 2), (5, 3), (11, 7)] # growth lengths and corresponding costs
-        min_drops = float('inf')
-        best_growth = -1
+        best = float('inf')
+        best_growth = None
+        for growth, cost in zip(growths, costs):
+            nj = j + growth
+            nd = d - cost
+            # skip if immediate next length is dead or budget would be non-positive
+            if nd <= 0:
+                continue
+            if nj % 7 == 2 and nj != n:  # disallow dead intermediate lengths (allow if it's the final target handled above)
+                continue
+            res = helper(nj, nd)
+            if res != float('inf') and res + 1 < best:
+                best = res + 1
+                best_growth = growth
 
-        # try each type of fertilizer
-        for growth, cost in drops:
-            prev_length = target - growth
-            remaining_budget = d - cost
+        memo[(j, d)] = best
+        choice[(j, d)] = best_growth
+        return best
 
-            if prev_length > 0 and prev_length % 7 != 2 and remaining_budget > 0: # skip dead lengths and ensure budget is positive
-                num_drops = 1 + helper(remaining_budget, prev_length)
-                if num_drops < min_drops: # float('inf') or num_drops + 1 < min_drops or num_drops + 1 == min_drops: # (num_drops + 1 == min_drops and growth < best_growth): # found better option
-                    min_drops = num_drops
-                    best_growth = growth
+    total = helper(1, D)
+    if total == float('inf'):
+        return (-1, [])
 
-        memo[(d, target)] = min_drops
-        choice[(d, target)] = best_growth
-        return min_drops
-
-    total_drops = helper(D, n) # start with budget D from length n
-    if total_drops == float('inf'): # impossible case
-        return (-1, []) # impossible case
-
-    fertilizers = [] # store sequence of fertilizers used
-    current_length = n
-    current_budget = D
-    while current_length > 1: # reconstruct path
-        growth = choice.get((current_budget, current_length))
-        if growth == -1 or growth is None:
+    # Reconstruct forward sequence
+    seq = []
+    j, d = 1, D
+    while j < n:
+        g = choice.get((j, d))
+        if g is None:
             break
-        fertilizers.append(growth)
-        growth_cost = {1:1, 4:2, 5:3, 11:7}[growth]
-        current_length -= growth
-        current_budget -= growth_cost # update budget based on cost of chosen fertilizer
+        seq.append(g)
+        d -= {1:1, 4:2, 5:3, 11:7}[g]
+        j += g
 
-    #fertilizers.reverse() # tried getting the correct order by doing a reverse but it didn't work
-    # not getting the exact order as pictured here is alright (from Office Hour)
-    return f"{total_drops}, {fertilizers}"
+    return (total, seq)
     #raise NotImplementedError("Function not yet implemented")
 
 # Example usage:
-D0 = 25
-n = 30
-result = minDropsWithBudget_Solution(D0, n)
+D0 = 35
+n = 60
+result = minDropsWithBudget_Solution(D0, n) #result should be 5, [4, 5, 4, 5, 11]
 print(f"Minimum drops and fertilizers to grow from 1 to {n} inches with budget {D0}:", result)  # Output: Minimum drops and fertilizers with budget
 
 
